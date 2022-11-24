@@ -5,6 +5,10 @@
 // C
 #include <stdint.h>
 
+typedef struct {			// Data type contain unique adress sensor DS18b20
+	uint8_t adres[8];
+}TAddrSlv;
+
 // Special return values
 static const uint16_t kDS18B20_DeviceNotFound = 0xA800;
 static const uint16_t kDS18B20_CrcCheckFailed = 0x5000;
