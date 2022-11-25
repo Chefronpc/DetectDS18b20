@@ -26,7 +26,10 @@ void	lcd_putInt_goto( int16_t, uint8_t);
 
 #define BAUD 115200
 
-#define CNTDS 64							// maximum number of sensor
+#define CNTDS 45							// maximum number of sensor
+
+#define PREV_READ 0								// State reading sensor
+#define NEW_READ 1							//
 
 #define MYUBRR (F_CPU/16UL/BAUD)-1			// parameter transfered to the procedure initiating RS485 transmision
 uint16_t ubrr = MYUBRR;
@@ -76,14 +79,16 @@ int main(void) {
 	// Initialize interface USART
 	ifRS485_init ( &if0pcBus );
 
-	for(uint8_t i=0;i<CNTDS;i++) 							// Filling table of zeros
+	for(uint8_t i=0;i<CNTDS;i++) { 							// Filling table of zeros
+		StateDS[i]=0;
 		for(uint8_t j=0; j<8; j++)
 			AdresSlv[i].adres[j]=0;
+	}
 
 	uint8_t x1=0,x2=0,x3=0,x4=0;
 	while(1) {
 		x1=0;
-//		onewire_search_init(&serialDS18b20);				// Prepare new search
+		onewire_search_init(&serialDS18b20);				// Prepare new search
 		while(onewire_search(&sensorPin, &serialDS18b20)) {
 			ifRS485_send( &if0pcBus, "\n" );
 			lcd_putULInt_goto((int32_t)x1++,10);
@@ -98,43 +103,61 @@ int main(void) {
 					if ( !match ) {							// Write a new sensor to the table
 						for (uint8_t j=0; j<8; j++) AdresSlv[i].adres[j]=serialDS18b20.address[j];
 						ifRS485_send( &if0pcBus, "SaveAdr " );
-						StateDS[i]=1;
+						StateDS[i] |= _BV(PREV_READ);
 					}
 					break;
-				}
-				uint8_t diff=0;
-/*				for (j=0; j<8; j++) {
-					if (AdresSlv[i].adres[j] != serialDS18b20.address[j]) {
-						diff=1;
-						break;
+				} else {
+					uint8_t diff=0;
+					for (uint8_t j=0; j<8; j++) {
+						if (AdresSlv[i].adres[j] != serialDS18b20.address[j]) {
+							diff=1;
+							break;
+						}
 					}
+
+					if (!diff) {
+						StateDS[i] |= _BV(NEW_READ);
+						match=1;
+						ifRS485_send( &if0pcBus, "[match]\n" );
+						break;
+
+					}
+
 				}
-*/
-				for (uint8_t y=0; y<8; y++ ) {
+
+		//		for (uint8_t y=0; y<8; y++ ) {
+		//			lcd_putULInt_goto((int32_t)AdresSlv[i].adres[y], 16);
+					_delay_ms(10);
+	//				ifRS485_send( &if0pcBus, ">" );
+	//				lcd_putULInt_goto((int32_t)StateDS[i], 10);
+				//}
+		//		ifRS485_send( &if0pcBus, "\n" );
+				_delay_ms(20);
+
+			}  // for (i)
+
+
+		} //while
+		ifRS485_send( &if0pcBus, "\n\n************\n\n" );
+		for (uint8_t i=0; i<CNTDS; i++) {
+			if (StateDS[i] == 1) {
+				for (uint8_t y=0; y<8; y++ )
 					lcd_putULInt_goto((int32_t)AdresSlv[i].adres[y], 16);
-		//			_delay_ms(10);
-		//			ifRS485_send( &if0pcBus, ">" );
-		//			lcd_putULInt_goto((int32_t)StateDS[i], 10);
-				}
-				ifRS485_send( &if0pcBus, "\n" );
-				_delay_ms(10);
-/*				if (onewire_reset(&sensorPin)) {
+				ifRS485_send( &if0pcBus, "->" );
+				if (onewire_reset(&sensorPin)) {
 					ds18b20_convert(&sensorPin);
 					_delay_ms(1000);
 					lcd_putULInt_goto((int32_t)(ds18b20_read_slave(&sensorPin, AdresSlv[i].adres)*10/16),10);
-				} */
+				}
+				_delay_ms(20);
 		//		lcd_putULInt_goto((int32_t)i,10);
 		//		ifRS485_send( &if0pcBus, " - end(i)\n" );
+			} // if (StatDS)
+			if (StateDS[i] == 3) StateDS[i] = 1;
 
-			}
+		} // for (i)
 
-
-		}
-
-
-
-
-	_delay_ms(1000);
+		_delay_ms(1000);
 	}
 
 }
