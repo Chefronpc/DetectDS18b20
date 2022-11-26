@@ -50,6 +50,9 @@ TifRS485 if0pcBus ={ 0, 0, MYUBRR, (uint8_t *)DDR_Dir, (uint8_t *)PORT_Dir, PIN_
 //const static gpin_t sensorPin = { &PORTD, &PIND, &DDRD, PD5 };
 const static gpin_t sensorPin = { &PORTC, &PINC, &DDRC, PC1 };
 
+TAddrSlv	AdresSlv[CNTDS];
+uint8_t		StateDS[CNTDS];
+float		Temp[CNTDS];
 
 // Timery programowe
 extern volatile  uint8_t Timer2,Timer3,Timer4,Timer5;	// znacznik aktywacji przerwania
@@ -61,9 +64,9 @@ int main(void) {
 
 	sei();
 
-	TAddrSlv	AdresSlv[CNTDS];
-	uint8_t		StateDS[CNTDS];
-	float		Temp[CNTDS];
+//	TAddrSlv	AdresSlv[CNTDS];
+//	uint8_t		StateDS[CNTDS];
+//	float		Temp[CNTDS];
 
 	// Prepare a new device search
     onewire_search_state serialDS18b20;
@@ -95,8 +98,8 @@ int main(void) {
 		ifRS485_send( &if0pcBus, "Series: " );
 		lcd_putULInt_goto((int32_t)x2++,10);
 		ifRS485_send( &if0pcBus, "\n\n" );
-		for (uint8_t i=0; i<CNTDS; i++)
-			if( StateDS[i] == 3) StateDS[i]=1;
+//		for (uint8_t i=0; i<CNTDS; i++)
+//			if( StateDS[i] == 3) StateDS[i]=1;
 		x1=0;
 		onewire_search_init(&serialDS18b20);				// Prepare new search
 		while(onewire_search(&sensorPin, &serialDS18b20)) {
@@ -157,6 +160,7 @@ int main(void) {
 					lcd_putULInt_goto((int32_t)AdresSlv[i].adres[y], 16);
 				ifRS485_send( &if0pcBus, " " );
 				lcd_putULInt_goto((int32_t)(Temp[i]*10/16),10);
+				lcd_putULInt_goto((int32_t)(read*10/16),10);
 				lcd_putULInt_goto((int32_t)Temp[i],10);
 				lcd_putULInt_goto((int32_t)read,10);
 				ifRS485_send( &if0pcBus, "\n" );
@@ -193,6 +197,9 @@ int main(void) {
 
 }
 
+//void FstateDS( uint8_t* state, uint*) {
+//	if ( *state == 0 )
+//}
 
 void lcd_putULInt_goto( uint32_t liczba, uint8_t sys) {
 	char *buf="                    ";
