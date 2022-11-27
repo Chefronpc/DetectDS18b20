@@ -68,7 +68,7 @@ int main(void) {
 	TAddrSlv	AdresSlv[CNTDS];
 	uint8_t		StateDS[CNTDS];
 	uint8_t		flow[CNTDS];
-	float		Temp[CNTDS];
+	uint16_t		Temp[CNTDS];
 
 	// Prepare a new device search
     onewire_search_state serialDS18b20;
@@ -264,10 +264,10 @@ int main(void) {
 		for (uint8_t i=0; i<CNTDS; i++) {
 			lcd_putULInt_goto((int32_t)i,10);
 			if( StateDS[i] == 2 && flow[i] == 24 ) {
-				read = ((float)(ds18b20_read_slave(&sensorPin, AdresSlv[i].adres)));
+				read = ((ds18b20_read_slave(&sensorPin, AdresSlv[i].adres)));
 				if (Temp[i]==0)
 					Temp[i]=read;
-				if ( ( read > Temp[i]*1.5) || (read < Temp[i]/1.5) ) { flow[i] = 25; StateDS[i] = 5; }
+				if ( ( read > Temp[i]*2) || (read < Temp[i]/2) ) { flow[i] = 25; StateDS[i] = 5; }
 				else {
 					uint16_t tmp = Temp[i]+read;
 					Temp[i]=tmp/2;
