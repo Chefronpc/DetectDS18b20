@@ -90,6 +90,7 @@ int main(void) {
 
 	for(uint8_t i=0;i<CNTDS;i++) { 						// Filling table of zeros
 		StateDS[i]=0;
+		flow[i]=0;
 		for(uint8_t j=0; j<8; j++)
 			AdresSlv[i].adres[j]=0;
 	}
@@ -164,6 +165,18 @@ int main(void) {
 							StateDS[i] = 4; flow[i] = 24;
 							break;
 
+						case 25:
+							StateDS[i] = 2; flow[i] = 52;
+							break;
+
+						case 52:
+							StateDS[i] = 4; flow[i] = 24;
+							break;
+
+						case 55:
+							StateDS[i] = 2; flow[i] = 52;
+							break;
+
 						case 32:
 							StateDS[i] = 4; flow[i] = 24;
 							break;
@@ -217,6 +230,10 @@ int main(void) {
 				StateDS[i] = 3; flow[i] = 33;
 				break;
 
+			case 25:
+				StateDS[i] = 5; flow[i] = 55;
+				break;
+
 			case 32:				//	case only information
 				ifRS485_send( &if0pcBus, "Add sensor! press [y]" );
 				_delay_ms(50);
@@ -246,10 +263,11 @@ int main(void) {
 		_delay_ms(50);
 		for (uint8_t i=0; i<CNTDS; i++) {
 			lcd_putULInt_goto((int32_t)i,10);
-			if( StateDS[i] == 2) {
+			if( StateDS[i] == 2 && flow[i] == 24 ) {
 				read = ((float)(ds18b20_read_slave(&sensorPin, AdresSlv[i].adres)));
 				if (Temp[i]==0)
 					Temp[i]=read;
+				if ( ( read > Temp[i]*1.5) || (read < Temp[i]/1.5) ) { flow[i] = 25; StateDS[i] = 5; }
 				else {
 					uint16_t tmp = Temp[i]+read;
 					Temp[i]=tmp/2;
@@ -266,8 +284,13 @@ int main(void) {
 				lcd_putULInt_goto((int32_t)read,10);
 				ifRS485_send( &if0pcBus, "\n" );
 			} else {
-				ifRS485_send( &if0pcBus, " offline sensor\n" );
-				_delay_ms(50);
+				if( StateDS[i] == 5 ) {
+					ifRS485_send( &if0pcBus, " Err read Temp\n" );
+					_delay_ms(50);
+				} else {
+					ifRS485_send( &if0pcBus, " offline sensor\n" );
+					_delay_ms(50);
+				}
 			}
 		}
 
