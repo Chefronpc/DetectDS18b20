@@ -26,7 +26,7 @@ void	lcd_putInt_goto( int16_t, uint8_t);
 
 #define BAUD 115200
 
-#define CNTDS 45							// maximum number of sensor
+#define CNTDS 33							// maximum number of sensor
 
 #define PREV_READ 0								// State reading sensor
 #define NEW_READ 1							//
@@ -40,7 +40,7 @@ uint16_t ubrr = MYUBRR;
 #define PORT_Dir	&PORTD
 #define PIN_TX_Dir	(1<<PD2)
 #define PIN_RX_Dir	(1<<PD5)
-#define BUFOR0_SIZE	64
+#define BUFOR0_SIZE	27
 
 //TifRS485	if0pcBus;	// interfejsy magistrali RS485
 TifRS485 if0pcBus ={ 0, 0, MYUBRR, (uint8_t *)DDR_Dir, (uint8_t *)PORT_Dir, PIN_TX_Dir, PIN_RX_Dir, 0, BUFOR0_SIZE };
@@ -50,10 +50,11 @@ TifRS485 if0pcBus ={ 0, 0, MYUBRR, (uint8_t *)DDR_Dir, (uint8_t *)PORT_Dir, PIN_
 //const static gpin_t sensorPin = { &PORTD, &PIND, &DDRD, PD5 };
 const static gpin_t sensorPin = { &PORTC, &PINC, &DDRC, PC1 };
 
-TAddrSlv	AdresSlv[CNTDS];
+/*TAddrSlv	AdresSlv[CNTDS];
 uint8_t		StateDS[CNTDS];
+uint8_t		flow[CNTDS];
 float		Temp[CNTDS];
-
+*/
 // Timery programowe
 extern volatile  uint8_t Timer2,Timer3,Timer4,Timer5;	// znacznik aktywacji przerwania
 
@@ -64,9 +65,10 @@ int main(void) {
 
 	sei();
 
-//	TAddrSlv	AdresSlv[CNTDS];
-//	uint8_t		StateDS[CNTDS];
-//	float		Temp[CNTDS];
+	TAddrSlv	AdresSlv[CNTDS];
+	uint8_t		StateDS[CNTDS];
+	uint8_t		flow[CNTDS];
+	float		Temp[CNTDS];
 
 	// Prepare a new device search
     onewire_search_state serialDS18b20;
@@ -116,27 +118,123 @@ int main(void) {
 					if ( !match ) {							// Write a new sensor to the table
 						for (uint8_t j=0; j<8; j++) AdresSlv[i].adres[j]=serialDS18b20.address[j];
 	//					ifRS485_send( &if0pcBus, "SaveAdr " );
-						StateDS[i] = 1;
+						if (StateDS[i] == 0 ) { StateDS[i] = 1; flow[i] = 1; }
 					}
 					break;
 				} else {
 					uint8_t diff=0;
+		//			ifRS485_send( &if0pcBus, "\n" );
 					for (uint8_t j=0; j<8; j++) {
+
+			//			_delay_ms(20);
 						if (AdresSlv[i].adres[j] != serialDS18b20.address[j]) {
 							diff=1;
 							break;
 						}
 					}
-
+			//		lcd_putULInt_goto((int32_t)i,10);
+			//		lcd_putULInt_goto((int32_t)diff,10);
+			//		ifRS485_send( &if0pcBus, "\n" );
+			//		_delay_ms(1);
 					if (!diff) {
-						StateDS[i] = 3;
+						ifRS485_send( &if0pcBus, "Match-> " );
+						lcd_putULInt_goto((int32_t)i,10);
+						lcd_putULInt_goto((int32_t)StateDS[i],10);
+						lcd_putULInt_goto((int32_t)flow[i],10);
+						_delay_ms(2);
+
+						switch (flow[i]) {
+						case 1:
+							StateDS[i] = 2; flow[i] = 12;
+							break;
+
+						case 12:
+							StateDS[i] = 4; flow[i] = 24;
+							break;
+
+						case 13:
+							StateDS[i] = 2; flow[i] = 32;
+							break;
+
+						case 23:
+							StateDS[i] = 2; flow[i] = 32;
+							break;
+
+						case 24:
+							StateDS[i] = 4; flow[i] = 24;
+							break;
+
+						case 32:
+							StateDS[i] = 4; flow[i] = 24;
+							break;
+
+						case 33:
+							StateDS[i] = 2; flow[i] = 32;
+							break;
+
+						default:
+							break;
+
+						}
+						lcd_putULInt_goto((int32_t)StateDS[i],10);
+						lcd_putULInt_goto((int32_t)flow[i],10);
+						ifRS485_send( &if0pcBus, "\n" );
+						_delay_ms(2);
+
 						match=1;
 						break;
 					}
 				}
-				_delay_ms(20);
+				_delay_ms(2);
 			}  // for (i)
-		} //while
+		} //while search
+		_delay_ms(20);
+		ifRS485_send( &if0pcBus, "\n\n Switch states\n" );
+
+		for (uint8_t i=0; i<CNTDS; i++) {
+
+			lcd_putULInt_goto((int32_t)i,10);
+			lcd_putULInt_goto((int32_t)StateDS[i],10);
+			lcd_putULInt_goto((int32_t)flow[i],10);
+
+			switch (flow[i]) {
+
+			case 12:
+				ifRS485_send( &if0pcBus, "Add sensor! press [y]" );
+				_delay_ms(50);
+				uint8_t cnt = ifRS485_read(&if0pcBus, ReadData, 16);
+				while ( ReadData[0] != 121 ) {
+					uint8_t cnt = ifRS485_read(&if0pcBus, ReadData, 16);
+				}
+				break;
+
+			case 24:
+				if (StateDS[i] == 2) { StateDS[i] = 3; flow[i] = 23; }
+				if (StateDS[i] == 4)   StateDS[i] = 2;
+				break;
+
+			case 23:
+				StateDS[i] = 3; flow[i] = 33;
+				break;
+
+			case 32:				//	case only information
+				ifRS485_send( &if0pcBus, "Add sensor! press [y]" );
+				_delay_ms(50);
+				cnt = ifRS485_read(&if0pcBus, ReadData, 16);
+				while ( ReadData[0] != 121 ) {
+					uint8_t cnt = ifRS485_read(&if0pcBus, ReadData, 16);
+				}
+				break;
+
+			default:
+				break;
+			}
+
+			lcd_putULInt_goto((int32_t)StateDS[i],10);
+			lcd_putULInt_goto((int32_t)flow[i],10);
+			ifRS485_send( &if0pcBus, "\n" );
+			_delay_ms(2);
+		}
 
 		ifRS485_send( &if0pcBus, "\n\n* Convert *\n\n" );
 		if (onewire_reset(&sensorPin)) {
@@ -144,9 +242,11 @@ int main(void) {
 			_delay_ms(1000);
 		}
 
-
+		ifRS485_send( &if0pcBus, "\n\n Print read sensors\n" );
+		_delay_ms(50);
 		for (uint8_t i=0; i<CNTDS; i++) {
-			if( StateDS[i] == 3) {
+			lcd_putULInt_goto((int32_t)i,10);
+			if( StateDS[i] == 2) {
 				read = ((float)(ds18b20_read_slave(&sensorPin, AdresSlv[i].adres)));
 				if (Temp[i]==0)
 					Temp[i]=read;
@@ -155,20 +255,28 @@ int main(void) {
 					Temp[i]=tmp/2;
 				}
 
-				lcd_putULInt_goto((int32_t)i,10);
 				for (uint8_t y=0; y<8; y++ )
 					lcd_putULInt_goto((int32_t)AdresSlv[i].adres[y], 16);
 				ifRS485_send( &if0pcBus, " " );
+				_delay_ms(5);
 				lcd_putULInt_goto((int32_t)(Temp[i]*10/16),10);
 				lcd_putULInt_goto((int32_t)(read*10/16),10);
+				_delay_ms(5);
 				lcd_putULInt_goto((int32_t)Temp[i],10);
 				lcd_putULInt_goto((int32_t)read,10);
 				ifRS485_send( &if0pcBus, "\n" );
+			} else {
+				ifRS485_send( &if0pcBus, " offline sensor\n" );
+				_delay_ms(50);
 			}
 		}
 
+		ifRS485_send( &if0pcBus, "\n\n Raport loss sensor\n" );
+		_delay_ms(50);
 		for (uint8_t i=0; i<CNTDS; i++) {
-			if (StateDS[i] == 1 && x2 != 2 ) {
+			if (StateDS[i] == 3 && flow[i] == 23) {
+			//if (StateDS[i] == 3 && (flow[i] == 13 || flow[i] == 23)) {
+				lcd_putULInt_goto((int32_t)i,10);
 				for (uint8_t y=0; y<8; y++ ) {
 					lcd_putULInt_goto((int32_t)AdresSlv[i].adres[y], 16);
 				//	AdresSlv[i].adres[y]=0;
@@ -177,29 +285,24 @@ int main(void) {
 				lcd_putULInt_goto((int32_t)Temp[i]*10/16,10);
 				lcd_putULInt_goto((int32_t)Temp[i],10);
 				ifRS485_send( &if0pcBus, "\n" );
-				StateDS[i]=0;
 				Temp[i]=0;
 				_delay_ms(20);
 
-				ifRS485_send( &if0pcBus, "Next cycle - press <n>\n" );
-
+				ifRS485_send( &if0pcBus, "Next cycle press <y>\n" );
+				_delay_ms(50);
 				uint8_t cnt = ifRS485_read(&if0pcBus, ReadData, 16);
-				while ( ReadData[0] != 110 ) {
+				while ( ReadData[0] != 121 ) {
 					uint8_t cnt = ifRS485_read(&if0pcBus, ReadData, 16);
 				}
 			} // if (StateDS)
 		} // for (i)
 
-
-		ifRS485_send( &if0pcBus, "\n Possible remove sensor - 2 sec.\n\n" );
+		_delay_ms(100);
+		ifRS485_send( &if0pcBus, "\nPossible remove 5sec\n" );
 		_delay_ms(5000);
-	}
+	} // while (1)
 
-}
-
-//void FstateDS( uint8_t* state, uint*) {
-//	if ( *state == 0 )
-//}
+} // main
 
 void lcd_putULInt_goto( uint32_t liczba, uint8_t sys) {
 	char *buf="                    ";
