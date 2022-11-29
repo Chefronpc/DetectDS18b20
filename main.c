@@ -26,7 +26,7 @@ void	lcd_putInt_goto( int16_t, uint8_t);
 
 #define BAUD 115200
 
-#define CNTDS 33							// maximum number of sensor
+#define CNTDS 32							// maximum number of sensor
 
 #define PREV_READ 0								// State reading sensor
 #define NEW_READ 1							//
@@ -65,10 +65,10 @@ int main(void) {
 
 	sei();
 
-	TAddrSlv	AdresSlv[CNTDS];
-	uint8_t		StateDS[CNTDS];
-	uint8_t		flow[CNTDS];
-	uint16_t		Temp[CNTDS];
+	static TAddrSlv	AdresSlv[CNTDS];
+	static uint8_t		StateDS[CNTDS];
+	static uint8_t		flow[CNTDS];
+	static uint16_t		Temp[CNTDS];
 
 	// Prepare a new device search
     onewire_search_state serialDS18b20;
@@ -95,7 +95,7 @@ int main(void) {
 			AdresSlv[i].adres[j]=0;
 	}
 
-	uint16_t read;
+	static uint16_t read;
 	uint8_t x1=0,x2=1;
 	while(1) {
 		ifRS485_send( &if0pcBus, "Series: " );
